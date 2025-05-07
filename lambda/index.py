@@ -1,20 +1,25 @@
-# lambda/index.py
 import json
 import urllib.request
 
-FASTAPI_ENDPOINT = "https://cdc6-34-142-252-55.ngrok-free.app/chat"
+# FastAPI の /generate エンドポイント
+FASTAPI_ENDPOINT = "https://a750-34-19-79-110.ngrok-free.app/generate"
 
 def lambda_handler(event, context):
     try:
+        # イベントからクエリ本文を取得して JSON に変換
         body = json.loads(event['body'])
         message = body.get('message')
-        conversation_history = body.get('conversationHistory', [])
 
+        # FastAPI に送るペイロードを構築（/generate 用）
         payload = {
-            "message": message,
-            "conversationHistory": conversation_history
+            "prompt": message,
+            "max_new_tokens": 512,
+            "do_sample": True,
+            "temperature": 0.7,
+            "top_p": 0.9
         }
 
+        # HTTP POSTリクエスト
         req = urllib.request.Request(
             FASTAPI_ENDPOINT,
             data=json.dumps(payload).encode('utf-8'),
@@ -26,6 +31,7 @@ def lambda_handler(event, context):
             response_body = response.read().decode('utf-8')
             result = json.loads(response_body)
 
+        # フロントエンドが期待する形式に整形して返す
         return {
             "statusCode": 200,
             "headers": {
@@ -34,7 +40,9 @@ def lambda_handler(event, context):
                 "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
                 "Access-Control-Allow-Methods": "OPTIONS,POST"
             },
-            "body": json.dumps(result)
+            "body": json.dumps({
+                "message": result["generated_text"]  # フロントに合わせた形式
+            })
         }
 
     except Exception as error:
